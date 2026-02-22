@@ -1,0 +1,5 @@
+# @package _group_
+_target_: colat.models.LinearConditional
+normalize: True
+alpha: 0.1
+size: 512

@@ -1,0 +1,1 @@
+python train_direction_models.py  > output_logs/training_directions_bbc021.log 2>&1 

@@ -7,7 +7,7 @@ from typing import Tuple
 from torch.utils.data import DataLoader
 
 from config_base import BaseConfig
-from dataset import *
+from dataset import BBCDataset, SmalaDataset
 from diffusion import *
 from diffusion.base import GenerativeType, LossType, ModelMeanType, ModelVarType, get_named_beta_schedule
 from model import *
@@ -21,24 +21,11 @@ data_paths = {
     'ffhqlmdb256':
     os.path.expanduser('datasets/ffhq256.lmdb'),
     # used for training a classifier
-    'celeba':
-    os.path.expanduser('datasets/celeba'),
-    # used for training DPM models
-    'celebalmdb':
-    os.path.expanduser('datasets/celeba.lmdb'),
-    'celebahq':
-    os.path.expanduser('datasets/celebahq256.lmdb'),
-    'horse256':
-    os.path.expanduser('datasets/horse256.lmdb'),
-    'bedroom256':
-    os.path.expanduser('datasets/bedroom256.lmdb'),
-    'celeba_anno':
-    os.path.expanduser('datasets/celeba_anno/list_attr_celeba.txt'),
-    'celebahq_anno':
-    os.path.expanduser(
-        'datasets/celeba_anno/CelebAMask-HQ-attribute-anno.txt'),
-    'celeba_relight':
-    os.path.expanduser('datasets/celeba_hq_light/celeba_light.txt'),
+    'smala':
+    os.path.expanduser('/projects/smala3/Saranga/preprocessed_data/subneg_reacquired'),
+
+    'bbc021_simple':
+    os.path.expanduser('/projects/deepdevpath/Anis/diffusion-comparison-experiments/datasets/bbc021_simple'),
 }
 
 
@@ -281,26 +268,16 @@ class TrainConfig(BaseConfig):
         # latent can have different eval T
         return self._make_latent_diffusion_conf(T=self.latent_T_eval)
 
-    def make_dataset(self, path=None, **kwargs):
-        if self.data_name == 'ffhqlmdb256':
-            return FFHQlmdb(path=path or self.data_path,
-                            image_size=self.img_size,
-                            **kwargs)
-        elif self.data_name == 'horse256':
-            return Horse_lmdb(path=path or self.data_path,
-                              image_size=self.img_size,
-                              **kwargs)
-        elif self.data_name == 'bedroom256':
-            return Horse_lmdb(path=path or self.data_path,
-                              image_size=self.img_size,
-                              **kwargs)
-        elif self.data_name == 'celebalmdb':
-            # always use d2c crop
-            return CelebAlmdb(path=path or self.data_path,
-                              image_size=self.img_size,
-                              original_resolution=None,
-                              crop_d2c=True,
-                              **kwargs)
+    def make_dataset(self, path = None, **kwargs):
+    
+        if self.data_name == 'smala':
+            return SmalaDataset(path = path or self.data_path,
+                                image_size=self.img_size,
+                                **kwargs)
+        elif self.data_name == 'bbc021_simple':
+            return BBCDataset(path=path or self.data_path,
+                              img_size=self.img_size, split = None)
+
         else:
             raise NotImplementedError()
 

@@ -1,0 +1,6 @@
+defaults:
+  - model: global
+  - projector: identity
+  - misc: gen_misc
+  - hydra/job_logging: custom
+  - hydra/output: custom

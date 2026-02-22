@@ -1,0 +1,8 @@
+defaults:
+  - model: nonlinear
+  - loss: contrastive
+  - projector: nonlinear
+  - hparams: default # change when Hydra 1.1 releases
+  - misc: train_misc
+  - hydra/job_logging: custom
+  - hydra/output: custom

@@ -1,0 +1,1 @@
+python run_bbc021.py > output_logs/training_bbc.log 2>&1 

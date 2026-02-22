@@ -1,0 +1,5 @@
+# @package _group_
+_target_: colat.projectors.LinearProjector
+normalize: True
+in_features: 512
+out_features: 128

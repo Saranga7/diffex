@@ -2,14 +2,46 @@ temp
 __pycache__
 generated
 latent_infer
-datasets/bedroom256.lmdb
-datasets/horse256.lmdb
-datasets/celebahq
-datasets/celebahq256.lmdb
-datasets/ffhq
-datasets/ffhq256.lmdb
-datasets/celeba.lmdb
-datasets/celeba
-checkpoints
-
+datasets/
+checkpoints/
+wandb/
 .ipynb_checkpoints/
+evals/
+bad_files.txt
+outputs/
+output_logs/
+evals/
+imgs/
+imgs_align/
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Visual Studio code files
+.vscode/

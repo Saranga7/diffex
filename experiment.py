@@ -8,7 +8,7 @@ import pandas as pd
 import pytorch_lightning as pl
 import torch
 from numpy.lib.function_base import flip
-from pytorch_lightning import loggers as pl_loggers
+# from pytorch_lightning import loggers as pl_loggers
 from pytorch_lightning.callbacks import *
 from torch import nn
 from torch.cuda import amp
@@ -23,6 +23,11 @@ from dist_utils import *
 from lmdb_writer import *
 from metrics import *
 from renderer import *
+
+import wandb
+from wandb import Image
+wandb.login(key="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")
+from pytorch_lightning.loggers import WandbLogger
 
 
 class LitModel(pl.LightningModule):
@@ -117,39 +122,52 @@ class LitModel(pl.LightningModule):
         pred_img = (pred_img + 1) / 2
         return pred_img
 
-    def render(self, noise, cond=None, T=None):
+    def render(self, noise, cond=None, T=None, mode = 'non_ema'):
         if T is None:
             sampler = self.eval_sampler
         else:
             sampler = self.conf._make_diffusion_conf(T).make_sampler()
+        
+        if mode == 'ema':
+            model = self.ema_model
+        else:
+            model = self.model
 
         if cond is not None:
             pred_img = render_condition(self.conf,
-                                        self.ema_model,
+                                        model,
                                         noise,
                                         sampler=sampler,
                                         cond=cond)
         else:
             pred_img = render_uncondition(self.conf,
-                                          self.ema_model,
+                                          model,
                                           noise,
                                           sampler=sampler,
                                           latent_sampler=None)
         pred_img = (pred_img + 1) / 2
         return pred_img
 
-    def encode(self, x):
+    def encode(self, x, mode = 'non_ema'):
         # TODO:
         assert self.conf.model_type.has_autoenc()
-        cond = self.ema_model.encoder.forward(x)
+        if mode == 'ema':
+            model = self.ema_model
+        else:
+            model = self.model
+        cond = model.encoder.forward(x)
         return cond
 
-    def encode_stochastic(self, x, cond, T=None):
+    def encode_stochastic(self, x, cond, T=None, mode = 'non_ema'):
         if T is None:
             sampler = self.eval_sampler
         else:
             sampler = self.conf._make_diffusion_conf(T).make_sampler()
-        out = sampler.ddim_reverse_sample_loop(self.ema_model,
+        if mode == 'ema':
+            model = self.ema_model
+        else:
+            model = self.model
+        out = sampler.ddim_reverse_sample_loop(model,
                                                x,
                                                model_kwargs={'cond': cond})
         return out['sample']
@@ -398,12 +416,18 @@ class LitModel(pl.LightningModule):
                     losses[key] = self.all_gather(losses[key]).mean()
 
             if self.global_rank == 0:
-                self.logger.experiment.add_scalar('loss', losses['loss'],
-                                                  self.num_samples)
+                # self.logger.experiment.add_scalar('loss', losses['loss'],
+                #                                   self.num_samples)
+                log_data = {
+                            'loss': losses['loss'].item(),  
+                        }
+                
                 for key in ['vae', 'latent', 'mmd', 'chamfer', 'arg_cnt']:
                     if key in losses:
-                        self.logger.experiment.add_scalar(
-                            f'loss/{key}', losses[key], self.num_samples)
+                        log_data[f'loss/{key}'] = losses[key].item()
+                        # self.logger.experiment.add_scalar(
+                        #     f'loss/{key}', losses[key], self.num_samples)
+                wandb.log(log_data, step = self.num_samples)
 
         return {'loss': loss}
 
@@ -516,9 +540,14 @@ class LitModel(pl.LightningModule):
 
                     if self.global_rank == 0:
                         grid_real = (make_grid(real) + 1) / 2
-                        self.logger.experiment.add_image(
-                            f'sample{postfix}/real', grid_real,
-                            self.num_samples)
+                        # self.logger.experiment.add_image(
+                        #     f'sample{postfix}/real', grid_real,
+                        #     self.num_samples)
+                        
+                        wandb.log({
+                                f'sample{postfix}/real': [Image(grid_real)],
+                                'num_samples': self.num_samples
+                            }, step = self.num_samples)
 
                 if self.global_rank == 0:
                     # save samples to the tensorboard
@@ -530,8 +559,13 @@ class LitModel(pl.LightningModule):
                     path = os.path.join(sample_dir,
                                         '%d.png' % self.num_samples)
                     save_image(grid, path)
-                    self.logger.experiment.add_image(f'sample{postfix}', grid,
-                                                     self.num_samples)
+                    # self.logger.experiment.add_image(f'sample{postfix}', grid,
+                    #                                  self.num_samples)
+                    
+                    wandb.log({
+                                f'sample{postfix}': [Image(grid)],
+                                'num_samples': self.num_samples
+                            }, step = self.num_samples)
             model.train()
 
         if self.conf.sample_every_samples > 0 and is_time(
@@ -587,8 +621,14 @@ class LitModel(pl.LightningModule):
                                  conds_mean=self.conds_mean,
                                  conds_std=self.conds_std)
             if self.global_rank == 0:
-                self.logger.experiment.add_scalar(f'FID{postfix}', score,
-                                                  self.num_samples)
+                # self.logger.experiment.add_scalar(f'FID{postfix}', score,
+                #                                   self.num_samples)
+                
+                wandb.log({
+                            f'FID{postfix}': score,
+                            # 'num_samples': self.num_samples
+                        }, step = self.num_samples)
+                
                 if not os.path.exists(self.conf.logdir):
                     os.makedirs(self.conf.logdir)
                 with open(os.path.join(self.conf.logdir, 'eval.txt'),
@@ -612,14 +652,17 @@ class LitModel(pl.LightningModule):
 
                 if self.global_rank == 0:
                     for key, val in score.items():
-                        self.logger.experiment.add_scalar(
-                            f'{key}{postfix}', val, self.num_samples)
+                        # self.logger.experiment.add_scalar(
+                        #     f'{key}{postfix}', val, self.num_samples)
+                        wandb.log({
+                                    f'{key}{postfix}': val,
+                                }, step = self.num_samples)
 
         if self.conf.eval_every_samples > 0 and self.num_samples > 0 and is_time(
                 self.num_samples, self.conf.eval_every_samples,
                 self.conf.batch_size_effective):
             print(f'eval fid @ {self.num_samples}')
-            lpips(self.model, '')
+            # lpips(self.model, '')
             fid(self.model, '')
 
         if self.conf.eval_ema_every_samples > 0 and self.num_samples > 0 and is_time(
@@ -887,6 +930,12 @@ def train(conf: TrainConfig, gpus, nodes=1, mode: str = 'train'):
                                  save_top_k=1,
                                  every_n_train_steps=conf.save_every_samples //
                                  conf.batch_size_effective)
+    
+    epoch_checkpoint_callback = ModelCheckpoint(dirpath=f'{conf.logdir}/epoch_checkpoints',
+                                                save_top_k=-1,  # save all checkpoints
+                                                every_n_epochs=50,  # save checkpoint every 20 epochs
+                                                )
+    
     checkpoint_path = f'{conf.logdir}/last.ckpt'
     print('ckpt path:', checkpoint_path)
     if os.path.exists(checkpoint_path):
@@ -899,9 +948,12 @@ def train(conf: TrainConfig, gpus, nodes=1, mode: str = 'train'):
         else:
             resume = None
 
-    tb_logger = pl_loggers.TensorBoardLogger(save_dir=conf.logdir,
-                                             name=None,
-                                             version='')
+    # tb_logger = pl_loggers.TensorBoardLogger(save_dir=conf.logdir,
+    #                                          name=None,
+    #                                          version='')
+
+    wandb.init(project = f"DiffAE_{conf.name}", entity = "saranga7", config = conf.as_dict_jsonable())
+    wandb_logger = WandbLogger(name = conf.name, save_dir = conf.logdir)
 
     # from pytorch_lightning.
 
@@ -924,18 +976,25 @@ def train(conf: TrainConfig, gpus, nodes=1, mode: str = 'train'):
         precision=16 if conf.fp16 else 32,
         callbacks=[
             checkpoint,
+            epoch_checkpoint_callback,
             LearningRateMonitor(),
         ],
         # clip in the model instead
         # gradient_clip_val=conf.grad_clip,
-        replace_sampler_ddp=True,
-        logger=tb_logger,
-        accumulate_grad_batches=conf.accum_batches,
-        plugins=plugins,
+        replace_sampler_ddp = True,
+        logger = wandb_logger,
+        accumulate_grad_batches = conf.accum_batches,
+        plugins = plugins,
     )
+
+    torch.cuda.set_device(trainer.local_rank % len(gpus))
+    torch.cuda.empty_cache()
+    
+    model = LitModel(conf)
 
     if mode == 'train':
         trainer.fit(model)
+        print("\n\nTraining completed")
     elif mode == 'eval':
         # load the latest checkpoint
         # perform lpips
@@ -956,9 +1015,10 @@ def train(conf: TrainConfig, gpus, nodes=1, mode: str = 'train'):
 
         if get_rank() == 0:
             # save to tensorboard
-            for k, v in out.items():
-                tb_logger.experiment.add_scalar(
-                    k, v, state['global_step'] * conf.batch_size_effective)
+            # for k, v in out.items():
+            #     tb_logger.experiment.add_scalar(
+            #         k, v, state['global_step'] * conf.batch_size_effective)
+            wandb.log({k: v for k, v in out.items()}, step = state['global_step'] * conf.batch_size_effective)
 
             # # save to file
             # # make it a dict of list
@@ -973,3 +1033,5 @@ def train(conf: TrainConfig, gpus, nodes=1, mode: str = 'train'):
             # pd.DataFrame(out).to_csv(tgt)
     else:
         raise NotImplementedError()
+    
+    wandb.finish()

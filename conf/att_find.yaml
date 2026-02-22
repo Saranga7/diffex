@@ -1,0 +1,6 @@
+defaults:
+  - model: global
+  - projector: nonlinear
+  - misc: att_find_misc
+  - hydra/job_logging: custom
+  - hydra/output: custom

@@ -1,0 +1,1 @@
+python run_smala.py > output_logs/training_smala4.log 2>&1 

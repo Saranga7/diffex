@@ -3,6 +3,7 @@ import shutil
 
 import torch
 import torchvision
+from torch.utils.data import Dataset
 from pytorch_fid import fid_score
 from torch import distributed
 from torch.utils.data import DataLoader
@@ -13,6 +14,7 @@ from renderer import *
 from config import *
 from diffusion import Sampler
 from dist_utils import *
+from dataset import SubsetDataset
 import lpips
 from ssim import ssim
 
@@ -292,7 +294,7 @@ def evaluate_fid(
                         x_start=imgs,
                         cond=None,
                         sampler=sampler,
-                        latent_sampler=latent_sampler).cpu()
+                        ).cpu()
                     # model: BeatGANsAutoencModel
                     # # returns {'cond', 'cond2'}
                     # conds = model.encode(imgs)
