@@ -139,7 +139,6 @@ def generate(cfg: DictConfig) -> None:
     # generator: torch.nn.Module = instantiate(cfg.generator).to(device)
     # DiffAE encoder as generator
     conf = bbc_autoenc()
-    conf.batch_size = cfg.hparams.batch_size
 
     generator = LitModel(conf)
     diffae_ckpt_path = cfg.diffae_ckpt_path

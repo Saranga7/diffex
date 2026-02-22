@@ -155,11 +155,12 @@ class Visualizer:
             return zs
         
         def _classify(imgs):
-            model = PretrainedClassifier
+            model = PretrainedClassifier()
             model.load_state_dict(torch.load(self.classifier_path, 
-                                            #  map_location = "cpu"
+                                             map_location = "cpu"
                                              ), 
                                              strict = True)
+            model.to(self.device)
             return torch.softmax(model(imgs), dim=1)
 
 

@@ -1,6 +1,6 @@
 defaults:
-  - model: global
-  - projector: identity
+  - model: nonlinear
+  - projector: nonlinear
   - misc: gen_misc
   - hydra/job_logging: custom
   - hydra/output: custom

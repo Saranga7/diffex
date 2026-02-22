@@ -2,15 +2,19 @@
 checkpoint: ???
 
 auto_cpu_if_no_gpu: true
-device: cuda:0
+device: cuda:2
+
+hparams:
+  batch_size: 128
 
 n_samples: 10
-n_dirs: 10
+n_dirs: [0,1,2,3,4]
 alphas: [-0.3, -0.2, -0.1, 0, 0.1, 0.2, 0.3]
-iterative: True
-image_size: 256
+iterative: False
+image_size: 128
 
-k: 32
+k: 10
 feed_layers: null
 use_ema: false
 classifier_path: /projects/smala3/Saranga/explainability/diffae/Classifier/classifier_saved_models/BBC_classifier.pth
+diffae_ckpt_path: /projects/smala3/Saranga/explainability/diffae/checkpoints/bbc_021/last.ckpt
